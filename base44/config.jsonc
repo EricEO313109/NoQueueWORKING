@@ -1,5 +1,5 @@
 {
-  "name": "untitled",
+  "name": "NoQueue Cluj",
   "site": {
     "installCommand": "npm install",
     "buildCommand": "npm run build",

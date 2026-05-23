@@ -1,0 +1,39 @@
+{
+  "name": "GoogleDriveConnection",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "connected_email": {
+      "type": "string"
+    },
+    "drive_folder_id": {
+      "type": "string"
+    },
+    "drive_folder_name": {
+      "type": "string"
+    },
+    "auth_mode": {
+      "type": "string",
+      "default": "token"
+    },
+    "scopes": {
+      "type": "string"
+    },
+    "is_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "last_sync_at": {
+      "type": "string"
+    },
+    "access_token": {
+      "type": "string",
+      "description": "In-memory session only — cleared on disconnect"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}
