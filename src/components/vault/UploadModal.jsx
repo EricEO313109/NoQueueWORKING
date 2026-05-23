@@ -4,7 +4,7 @@ import { X, Upload, FileText, Loader2, Sparkles, Check, AlertCircle } from 'luci
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { base44 } from '@/api/base44Client';
-import { DOC_TYPES } from './DocumentCard';
+import { DOC_TYPES } from './docTypes';
 
 const ACCEPTED = '.pdf,.jpg,.jpeg,.png,.heic';
 

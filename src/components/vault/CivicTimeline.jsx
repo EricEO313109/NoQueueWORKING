@@ -4,7 +4,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Upload, RefreshCw, FileText, AlertTriangle } from 'lucide-react';
-import { DOC_TYPES } from './DocumentCard';
+import { DOC_TYPES } from './docTypes';
 import { format } from 'date-fns';
 
 function TimelineItem({ doc, index }) {

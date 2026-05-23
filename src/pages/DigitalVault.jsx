@@ -20,7 +20,7 @@ import VaultDocumentCard from '@/components/vault/VaultDocumentCard';
 import CivicTimeline from '@/components/vault/CivicTimeline';
 import UploadModal from '@/components/vault/UploadModal';
 import { getExpiryInfo } from '@/components/vault/ExpirationBadge';
-import { DOC_TYPES } from '@/components/vault/DocumentCard';
+import { DOC_TYPES } from '@/components/vault/docTypes';
 
 const FILTERS = [
   { key: 'all',        label: 'All Docs' },

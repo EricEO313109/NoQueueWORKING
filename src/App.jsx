@@ -14,7 +14,6 @@ import Onboarding from './pages/Onboarding';
 import IdentityVault from './pages/IdentityVault';
 import DigitalVault from './pages/DigitalVault';
 import PassportDemo from './pages/PassportDemo';
-// Add page imports here
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();

@@ -1,39 +1,48 @@
-**Welcome to your Base44 project** 
+# NoQueue AI — Cluj-Napoca Civic Assistant
 
-**About**
+Hackathon project (ClujHackathon 2026) that digitizes Romanian civic bureaucracy for Cluj-Napoca. Built on [Base44](https://base44.com) + React/Vite.
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+## What it does
 
-This project contains everything you need to run your app locally.
+- **AI procedure routing** — Classifies citizen requests into procedures, institutions, channels, and document lists (`/` home chat, `/start` case intake).
+- **Case management** — Active cases with readiness scoring, RAG plans, and PDF prep sheets (`/cases`).
+- **Identity vault** — Encrypted profile data (CNP, ID, address) for autofill (`/vault`).
+- **Document wallet** — Upload government documents, expiry alerts, OCR, AI assistant (`/digital-vault`).
+- **Passport demo** — End-to-end lost-passport flow (`/demo/passport`).
+- **Institution finder & map** — 11 Cluj institutions with simulated queue data (demo MVP).
 
-**Edit the code in your local development environment**
+## Tech stack
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+React 18 · Vite 6 · React Router · TanStack Query · Tailwind · Base44 SDK · pdf-lib · react-leaflet · framer-motion
 
-**Prerequisites:** 
+## Local development
 
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
+1. `npm install`
+2. Create `.env.local`:
 
 ```
 VITE_BASE44_APP_ID=your_app_id
 VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
 ```
 
-Run the app: `npm run dev`
+3. `npm run dev`
 
-**Publish your changes**
+## Routes
 
-Open [Base44.com](http://Base44.com) and click on Publish.
+| Path | Purpose |
+|------|---------|
+| `/` | Landing + AI chat |
+| `/start` | Start a new case |
+| `/cases` | Case dashboard |
+| `/vault` | Identity seif (autofill) |
+| `/digital-vault` | Document wallet |
+| `/demo/passport` | Passport MVP demo |
+| `/appointments/watch` | Appointment watches |
+| `/profile` | User profile hub |
+| `/onboarding` | Consent collection |
 
-**Docs & Support**
+## Base44
 
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
+Entity schemas live in `base44/entities/`. Edit the app in the [Base44 Builder](https://base44.com) or push changes via GitHub sync.
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+Docs: [Base44 GitHub integration](https://docs.base44.com/Integrations/Using-GitHub)

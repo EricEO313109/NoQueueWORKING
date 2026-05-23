@@ -107,36 +107,3 @@ Output strict JSON only.`;
       : ['Save as case', 'View institution on map', 'Check queue', 'Book appointment'],
   };
 }
-
-export async function buildCasePlan(caseData, userDescription) {
-  const { institutionSummary } = buildContextSummary();
-  const inst = clujInstitutions.find(i => i.id === caseData.institution_key);
-
-  const prompt = `You are NoQueue Case Planner for Cluj-Napoca.
-
-Case: ${caseData.procedure_title}
-Institution: ${caseData.institution_name}
-Channel: ${caseData.channel}
-Urgency: ${caseData.urgency}
-User description: "${userDescription}"
-Required documents: ${(caseData.required_documents || []).join(', ')}
-Institution details: ${inst ? `Queue: ~${inst.queue.current}min | Hours: ${inst.hours?.weekdays} | Address: ${inst.address}` : 'N/A'}
-
-Produce a practical step-by-step action plan. Be specific to Cluj-Napoca.
-If online is possible, make that step #1.
-Output strict JSON only.`;
-
-  const schema = {
-    type: "object",
-    properties: {
-      summary: { type: "string" },
-      next_actions: { type: "array", items: { type: "string" } },
-      online_options: { type: "array", items: { type: "string" } },
-      likely_risks: { type: "array", items: { type: "string" } },
-      best_time_hint: { type: "string" },
-      should_use_online_channel: { type: "boolean" }
-    }
-  };
-
-  return base44.integrations.Core.InvokeLLM({ prompt, response_json_schema: schema });
-}

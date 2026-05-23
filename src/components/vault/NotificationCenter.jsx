@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, BellOff, AlertTriangle, Clock, CheckCircle2, ChevronRight, X } from 'lucide-react';
 import { getExpiryInfo } from './ExpirationBadge';
-import { DOC_TYPES } from './DocumentCard';
+import { DOC_TYPES } from './docTypes';
 import { Link } from 'react-router-dom';
 
 function buildNotifications(docs) {

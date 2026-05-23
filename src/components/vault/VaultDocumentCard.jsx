@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Trash2, Download, ChevronDown, ChevronUp, Building2, Zap, X } from 'lucide-react';
 import ExpirationBadge, { getExpiryInfo } from './ExpirationBadge';
 import DocumentActionPanel from './DocumentActionPanel';
-import { DOC_TYPES } from './DocumentCard';
+import { DOC_TYPES } from './docTypes';
 
 export default function VaultDocumentCard({ doc, onDelete }) {
   const [expanded, setExpanded] = useState(false);

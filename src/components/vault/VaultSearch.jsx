@@ -4,7 +4,7 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, FileText } from 'lucide-react';
-import { DOC_TYPES } from './DocumentCard';
+import { DOC_TYPES } from './docTypes';
 import ExpirationBadge from './ExpirationBadge';
 import { debounce } from 'lodash';
 

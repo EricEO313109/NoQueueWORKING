@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Clock, CheckCircle2, Zap } from 'lucide-react';
 import { getExpiryInfo } from './ExpirationBadge';
 import { getRenewalUrgency } from '@/lib/data/vaultActions';
-import { DOC_TYPES } from './DocumentCard';
+import { DOC_TYPES } from './docTypes';
 import { Link } from 'react-router-dom';
 
 function RenewalCard({ doc }) {
