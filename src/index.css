@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,148 +6,137 @@
 
 @layer base {
   :root {
-    --font-inter: 'Inter', sans-serif;
-    --background: 222 47% 3%;
-    --foreground: 210 40% 98%;
-    --card: 222 40% 10%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 40% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 189 94% 43%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 222 20% 18%;
-    --input: 222 20% 18%;
-    --ring: 217 91% 53%;
-    --chart-1: 217 91% 53%;
-    --chart-2: 189 94% 43%;
-    --chart-3: 142 71% 45%;
-    --chart-4: 48 96% 53%;
-    --chart-5: 0 84% 60%;
-    --radius: 0.75rem;
-    --success: 142 71% 45%;
-    --warning: 48 96% 53%;
-    --sidebar-background: 222 40% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 53%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 222 30% 14%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 20% 18%;
-    --sidebar-ring: 217 91% 53%;
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --bg: 0 0% 0%;
+    --surface-1: 0 0% 7%;
+    --surface-2: 0 0% 11%;
+    --surface-3: 0 0% 15%;
+    --surface-elevated: 0 0% 9%;
+    --accent: 14 100% 62%;
+    --muted: 0 0% 55%;
+    --border: 0 0% 100% / 0.08;
+    --success: 152 69% 48%;
+    --macro-cal: 199 89% 58%;
+    --macro-protein: 24 95% 58%;
+    --macro-carbs: 142 52% 52%;
+    --macro-fat: 45 93% 58%;
+    --nav-h: 4rem;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  .dark {
-    --background: 222 47% 3%;
-    --foreground: 210 40% 98%;
-    --card: 222 40% 10%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 40% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 189 94% 43%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 222 20% 18%;
-    --input: 222 20% 18%;
-    --ring: 217 91% 53%;
-    --chart-1: 217 91% 53%;
-    --chart-2: 189 94% 43%;
-    --chart-3: 142 71% 45%;
-    --chart-4: 48 96% 53%;
-    --chart-5: 0 84% 60%;
-    --sidebar-background: 222 40% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 53%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 222 30% 14%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 20% 18%;
-    --sidebar-ring: 217 91% 53%;
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    height: 100%;
+    overflow: hidden;
   }
-}
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-[hsl(var(--bg))] text-white antialiased;
+    font-family: var(--font-sans);
+    overscroll-behavior: none;
+    height: 100%;
+    min-height: 100%;
+    min-height: 100dvh;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  #root {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  @media (min-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 14px;
+    }
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: hsl(222 47% 3%);
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(222 20% 18%);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(217 91% 53%);
+@layer components {
+  .ns-card {
+    @apply rounded-2xl bg-surface-1 border border-white/[0.06] shadow-card;
+  }
+
+  .ns-card-elevated {
+    @apply rounded-2xl bg-surface-elevated border border-white/[0.08];
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .ns-divider {
+    @apply border-b border-white/[0.06];
+  }
+
+  .ns-macro-line {
+    @apply text-xs text-muted tabular-nums;
+    letter-spacing: 0.01em;
+  }
 }
 
-/* Glassmorphism utility */
-.glass {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+@layer utilities {
+  .bg-surface-1 { background-color: hsl(var(--surface-1)); }
+  .bg-surface-2 { background-color: hsl(var(--surface-2)); }
+  .bg-surface-3 { background-color: hsl(var(--surface-3)); }
+  .bg-surface-elevated { background-color: hsl(var(--surface-elevated)); }
+  .text-muted { color: hsl(var(--muted)); }
+  .text-accent { color: hsl(var(--accent)); }
+  .bg-accent { background-color: hsl(var(--accent)); }
+  .text-macro-cal { color: hsl(var(--macro-cal)); }
+  .text-macro-protein { color: hsl(var(--macro-protein)); }
+  .text-macro-carbs { color: hsl(var(--macro-carbs)); }
+  .text-macro-fat { color: hsl(var(--macro-fat)); }
+  .bg-macro-cal { background-color: hsl(var(--macro-cal)); }
+  .bg-macro-protein { background-color: hsl(var(--macro-protein)); }
+  .bg-macro-carbs { background-color: hsl(var(--macro-carbs)); }
+  .bg-macro-fat { background-color: hsl(var(--macro-fat)); }
+  .shadow-card { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45); }
+
+  .safe-top {
+    padding-top: max(0.75rem, var(--safe-top));
+  }
+
+  .safe-bottom {
+    padding-bottom: max(0.75rem, var(--safe-bottom));
+  }
+
+  .pb-nav {
+    padding-bottom: max(1.25rem, calc(var(--safe-bottom) + 1rem));
+  }
+
+  /** Full-screen flows without bottom tab bar */
+  .pb-screen {
+    padding-bottom: max(1.25rem, calc(var(--safe-bottom) + 1rem));
+  }
+
+  .min-h-app {
+    min-height: 100dvh;
+  }
+
+  .h-app {
+    height: 100dvh;
+  }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
-.glass-card {
-  background: rgba(17, 28, 51, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* Glow effects */
-.glow-blue {
-  box-shadow: 0 0 20px rgba(37, 99, 235, 0.15), 0 0 60px rgba(37, 99, 235, 0.05);
-}
-
-.glow-cyan {
-  box-shadow: 0 0 20px rgba(6, 182, 212, 0.15), 0 0 60px rgba(6, 182, 212, 0.05);
-}
-
-.glow-green {
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
-}
-
-/* Typing animation */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-.typing-cursor::after {
-  content: '▊';
-  animation: blink 1s infinite;
-  color: hsl(217 91% 53%);
-}
-
-/* Pulse glow */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(37, 99, 235, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(37, 99, 235, 0.6); }
-}
-.pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
+::-webkit-scrollbar { display: none; }
