@@ -61,7 +61,7 @@ export async function fetchProductByBarcode(barcode) {
 /** Direct OFF fallback (dev/offline only — not used in normal scan flow) */
 export async function fetchFromOpenFoodFactsDirect(barcode) {
   const clean = String(barcode).replace(/\D/g, '');
-  const res = await fetch(`${OFF_BASE}/${clean}.json`, {
+  const res = await fetch(`${OFF_BASE}/${clean}.json?cc=ro`, {
     headers: { 'User-Agent': 'StilMacros/1.0' },
   });
   if (!res.ok) throw new ProductNotFoundError(clean);

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMealText } from '../lib/server/mealParser.js';
+import { parseMealText, validateMealMacroArrayResponse } from '../lib/server/mealParser.js';
 import { estimateGramsFromPhrase, extractFoodNameFromLine } from '../lib/nutrition/quantityParser.js';
 import { resolveSearchQuery } from '../lib/nutrition/lineIntent.js';
 
@@ -56,6 +56,14 @@ describe('quantityParser', () => {
     const grams = estimateGramsFromPhrase(line, name);
     assert.equal(name, 'nuts');
     assert.equal(grams, 30);
+  });
+
+  it('treats bare liquid counts as milliliters not grams', () => {
+    const line = '300 milk';
+    const name = extractFoodNameFromLine(line);
+    const grams = estimateGramsFromPhrase(line, name);
+    assert.equal(name, 'milk');
+    assert.ok(grams >= 300 && grams <= 315, `300 milk should be ~309g, got ${grams}`);
   });
 });
 
@@ -256,5 +264,44 @@ describe('parseMealText — natural meal estimates', () => {
       assert.ok(result.items.some((i) => i.name.toLowerCase().includes(expected) && i.matched), JSON.stringify(result.items));
       assert.equal(result.needsClarification, false, `${text} should not need clarification`);
     }
+  });
+
+  it('autocorrects messy chicken wing logs and converts naked counts to grams', async () => {
+    const result = await parseMealText('8 chiken wings air fryed');
+    const wings = result.items.find((item) => item.name.toLowerCase().includes('wing'));
+
+    assert.ok(wings?.matched, JSON.stringify(result.items));
+    assert.match(wings.name, /Chicken Wings/i);
+    assert.equal(wings.weight, 240);
+    assert.ok(wings.calories > 400, `calories ${wings.calories}`);
+    assert.equal(result.needsClarification, false);
+    assert.equal(result.items.some((item) => item.name.toLowerCase().includes('oil')), false);
+  });
+
+  it('treats naked egg counts as pieces instead of grams', async () => {
+    const result = await parseMealText('2 eggs');
+    const eggs = result.items.find((item) => item.name.toLowerCase().includes('egg'));
+
+    assert.ok(eggs?.matched, JSON.stringify(result.items));
+    assert.equal(eggs.weight, 100);
+    assert.ok(result.totalCalories >= 130 && result.totalCalories <= 170, `total ${result.totalCalories}`);
+  });
+
+  it('adds an oil offset for fried-in-oil preparation but not air fried', async () => {
+    const fried = await parseMealText('8 chicken wings fried in oil');
+    const airFried = await parseMealText('8 chicken wings air fried');
+
+    assert.ok(fried.items.some((item) => item.name === 'Cooking Oil (Fried Offset)'), JSON.stringify(fried.items));
+    assert.equal(airFried.items.some((item) => item.name === 'Cooking Oil (Fried Offset)'), false);
+    assert.ok(fried.totalFat > airFried.totalFat, `${fried.totalFat} vs ${airFried.totalFat}`);
+  });
+
+  it('salvages malformed LLM JSON array wrappers', () => {
+    const items = validateMealMacroArrayResponse('```json\n[{"name":"Chicken Wings (Air Fried)","weight_g":240,"calories":487,"protein":51,"carbs":0,"fat":33}]\n```');
+
+    assert.equal(items.length, 1);
+    assert.equal(items[0].name, 'Chicken Wings (Air Fried)');
+    assert.equal(items[0].weight, 240);
+    assert.equal(items[0].matched, true);
   });
 });

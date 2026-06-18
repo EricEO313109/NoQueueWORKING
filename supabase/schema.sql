@@ -1,0 +1,3 @@
+-- NutriScan database schema
+-- Run the full migration in Supabase SQL Editor:
+--   supabase/migrations/001_production.sql

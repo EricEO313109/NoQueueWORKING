@@ -1,0 +1,22 @@
+[
+  {"id": "egg-1", "phrases": ["1 egg", "one egg", "an egg", "1 ou"], "grams": 50, "food": "egg"},
+  {"id": "egg-2", "phrases": ["2 eggs", "two eggs", "2 ou"], "grams": 100, "food": "egg"},
+  {"id": "banana-medium", "phrases": ["1 banana", "1 medium banana", "a banana"], "grams": 118, "food": "banana"},
+  {"id": "banana-small", "phrases": ["1 small banana"], "grams": 90, "food": "banana"},
+  {"id": "banana-large", "phrases": ["1 large banana"], "grams": 136, "food": "banana"},
+  {"id": "tortilla-small", "phrases": ["1 small tortilla", "1 small wrap"], "grams": 45, "food": "tortilla"},
+  {"id": "tortilla-medium", "phrases": ["1 tortilla", "1 wrap", "1 lipie"], "grams": 50, "food": "tortilla"},
+  {"id": "tortilla-large", "phrases": ["1 large tortilla", "1 large wrap"], "grams": 70, "food": "tortilla"},
+  {"id": "bread-slice", "phrases": ["1 slice bread", "1 slice toast", "1 slice"], "grams": 30, "food": "bread"},
+  {"id": "bread-2-slice", "phrases": ["2 slices bread", "2 slices toast"], "grams": 60, "food": "bread"},
+  {"id": "mayo-tbsp", "phrases": ["1 tbsp mayo", "1 tbsp mayonnaise", "1 tablespoon mayo"], "grams": 15, "food": "mayonnaise"},
+  {"id": "mayo-tsp", "phrases": ["1 tsp mayo", "1 teaspoon mayo"], "grams": 5, "food": "mayonnaise"},
+  {"id": "oil-tbsp", "phrases": ["1 tbsp oil", "1 tbsp olive oil", "1 tablespoon oil"], "grams": 14, "food": "oil"},
+  {"id": "oil-tsp", "phrases": ["1 tsp oil", "1 teaspoon olive oil"], "grams": 5, "food": "oil"},
+  {"id": "butter-tbsp", "phrases": ["1 tbsp butter", "1 tablespoon butter"], "grams": 14, "food": "butter"},
+  {"id": "butter-tsp", "phrases": ["1 tsp butter", "10g butter"], "grams": 10, "food": "butter"},
+  {"id": "rice-cup-cooked", "phrases": ["1 cup rice", "1 cup cooked rice"], "grams": 185, "food": "rice"},
+  {"id": "rice-cup-dry", "phrases": ["1 cup dry rice"], "grams": 185, "food": "rice"},
+  {"id": "pasta-cup-cooked", "phrases": ["1 cup pasta", "1 cup cooked pasta"], "grams": 140, "food": "pasta"},
+  {"id": "chicken-breast-piece", "phrases": ["1 chicken breast"], "grams": 174, "food": "chicken breast"}
+]

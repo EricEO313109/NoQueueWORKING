@@ -21,6 +21,7 @@
     --macro-carbs: 142 52% 52%;
     --macro-fat: 45 93% 58%;
     --nav-h: 4rem;
+    --nav-total-h: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -29,6 +30,8 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
     height: 100%;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
   }
 
@@ -36,16 +39,19 @@
     @apply bg-[hsl(var(--bg))] text-white antialiased;
     font-family: var(--font-sans);
     overscroll-behavior: none;
-    height: 100%;
-    min-height: 100%;
-    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    height: 100dvh;
+    height: 100svh;
     overflow: hidden;
     touch-action: manipulation;
   }
 
   #root {
     height: 100dvh;
-    min-height: 100dvh;
+    height: 100svh;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
   }
 
@@ -61,6 +67,10 @@
     select,
     textarea {
       font-size: 14px;
+    }
+
+    :root {
+      --nav-h: 5rem;
     }
   }
 }
@@ -112,7 +122,7 @@
   }
 
   .pb-nav {
-    padding-bottom: max(1.25rem, calc(var(--safe-bottom) + 1rem));
+    /* Deprecated: scroll clearance lives on .shell-main */
   }
 
   /** Full-screen flows without bottom tab bar */
@@ -126,6 +136,34 @@
 
   .h-app {
     height: 100dvh;
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  .mobile-nav {
+    flex: none;
+    flex-shrink: 0;
+    flex-grow: 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    background-color: #09090b;
+    border-top: 1px solid rgb(39 39 42);
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom, 12px));
+    max-height: 80px;
+    padding-bottom: env(safe-area-inset-bottom, 12px);
+  }
+
+  .mobile-nav__row {
+    box-sizing: border-box;
+    height: var(--nav-h);
+    min-height: 0;
+    max-height: var(--nav-h);
+    width: 100%;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
   }
 
   .touch-target {

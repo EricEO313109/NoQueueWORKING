@@ -4,6 +4,9 @@ import { getCachedSearch, setCachedSearch } from '@/lib/cache/ingredientCache';
 import { getRecentIngredients } from '@/lib/cache/ingredientCache';
 import { searchOpenFoodFacts } from '@/lib/api/openFoodFacts';
 import { searchLocalizedFoods, hasStrongLocalizedMatch } from '../../../lib/nutrition/localizedFoodSearch.js';
+import { searchFrequentFoods, hasStrongFrequentFoodMatch } from '@/lib/cache/frequentFoods';
+import { normalizeMealSearchQuery, stripDiacritics } from '../../../lib/nutrition/foodQuery.js';
+import { estimateFoodFromText } from '../../../lib/nutrition/estimatedFoodFallback.js';
 import seedData from '../../../data/ingredients-seed.json';
 
 const SEARCH_TIMEOUT_MS = 3500;
@@ -14,17 +17,32 @@ function withTimeout(ms = SEARCH_TIMEOUT_MS) {
   return { signal: controller.signal, done: () => clearTimeout(timeout) };
 }
 
-function scoreLocal(item, q) {
-  const terms = [item.name, ...(item.searchTerms || [])].map((t) => t.toLowerCase());
+function mergeSearchResults(...lists) {
+  const merged = [];
+  const seen = new Set();
+  for (const list of lists) {
+    for (const item of list || []) {
+      const key = item.id || item.barcode || item.name;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+  return merged;
+}
+
+function scoreLocal(item, rawQuery) {
+  const q = stripDiacritics(normalizeMealSearchQuery(rawQuery).toLowerCase());
+  const terms = [item.name, ...(item.searchTerms || [])].map((t) => stripDiacritics(t.toLowerCase()));
   let score = 0;
-  if (item.name.toLowerCase().includes(q)) score += 30;
+  if (stripDiacritics(item.name.toLowerCase()).includes(q)) score += 30;
   if (terms.some((t) => t === q)) score += 100;
   if (terms.some((t) => t.includes(q) || q.includes(t))) score += 40;
   return score;
 }
 
 function localSearch(query) {
-  const q = query.toLowerCase().trim();
+  const q = normalizeMealSearchQuery(query).toLowerCase().trim();
   return seedData
     .map((item) => ({ item, score: scoreLocal(item, q) }))
     .filter((x) => x.score > 0)
@@ -47,41 +65,34 @@ function localSearch(query) {
     });
 }
 
-export async function searchIngredients(query) {
-  const q = query.trim();
-  if (q.length < 2) return [];
+function estimatedSearchFallback(query) {
+  const estimate = estimateFoodFromText(query);
+  if (!estimate?.matched) return [];
+  return [{
+    id: estimate.ingredientId || `estimated-${estimate.name}`,
+    name: estimate.name,
+    displayName: estimate.name,
+    per100g: estimate.per100g,
+    defaultGrams: estimate.weight || estimate.grams || 100,
+    source: 'estimated',
+    confidence: estimate.confidence ?? 0.55,
+    searchKind: 'estimated',
+    estimated: true,
+    ...estimate,
+  }];
+}
 
-  const cached = getCachedSearch(q);
-  if (cached?.ingredients?.length) return cached.ingredients;
-
-  const recent = getRecentIngredients().filter((i) =>
-    i.name?.toLowerCase().includes(q.toLowerCase()),
-  );
-  const localized = searchLocalizedFoods(q);
-  if (hasStrongLocalizedMatch(q)) {
-    const merged = [...recent];
-    for (const item of localized) {
-      if (!merged.find((m) => m.id === item.id)) merged.push(item);
-    }
-    setCachedSearch(q, merged);
-    return merged;
-  }
-
+async function fetchRemoteIngredients(query) {
   try {
     const timeout = withTimeout();
     try {
-      const res = await apiFetch(`/api/ingredients/search?q=${encodeURIComponent(q)}`, {
+      const res = await apiFetch(`/api/ingredients/search?q=${encodeURIComponent(query)}`, {
         headers: deviceHeaders(),
         signal: timeout.signal,
       });
       if (res.ok) {
         const { ingredients } = await res.json();
-        const merged = [...recent];
-        for (const ing of ingredients || []) {
-          if (!merged.find((m) => m.id === ing.id)) merged.push(ing);
-        }
-        setCachedSearch(q, merged);
-        return merged;
+        return ingredients || [];
       }
     } finally {
       timeout.done();
@@ -89,12 +100,29 @@ export async function searchIngredients(query) {
   } catch (e) {
     console.warn('[ingredients] api', e);
   }
+  return [];
+}
 
+export async function searchIngredients(query) {
+  const q = normalizeMealSearchQuery(query.trim());
+  if (q.length < 2) return [];
+
+  const cached = getCachedSearch(q);
+  if (cached?.ingredients?.length) return cached.ingredients;
+
+  const memory = searchFrequentFoods(q);
+  const recent = getRecentIngredients().filter((i) =>
+    stripDiacritics(i.name?.toLowerCase() || '').includes(stripDiacritics(q.toLowerCase())),
+  );
+  const localized = searchLocalizedFoods(q);
+  const remote = await fetchRemoteIngredients(q);
   const local = localSearch(q);
-  const merged = [...recent, ...localized];
-  for (const ing of local) {
-    if (!merged.find((m) => m.id === ing.id)) merged.push(ing);
-  }
+  const estimated = (remote.length + local.length + localized.length === 0)
+    ? estimatedSearchFallback(q)
+    : [];
+
+  const merged = mergeSearchResults(memory, recent, localized, remote, local, estimated);
+  setCachedSearch(q, merged);
   return merged;
 }
 
@@ -117,10 +145,8 @@ function productToSearchResult(product) {
 }
 
 export async function searchGlobalFoods(query) {
-  const q = query.trim();
+  const q = normalizeMealSearchQuery(query.trim());
   if (q.length < 2) return [];
-  const localized = searchLocalizedFoods(q);
-  if (hasStrongLocalizedMatch(q)) return localized;
 
   const [ingredients, products] = await Promise.allSettled([
     searchIngredients(q),
@@ -142,23 +168,27 @@ export async function searchGlobalFoods(query) {
   };
 
   if (ingredients.status === 'fulfilled') {
-    ingredients.value.forEach((item) => add({ ...item, searchKind: 'ingredient' }));
+    ingredients.value.forEach((item) => add({ ...item, searchKind: item.searchKind || 'ingredient' }));
   }
   if (products.status === 'fulfilled') {
     products.value.map(productToSearchResult).forEach(add);
+  }
+
+  if (!merged.length) {
+    estimatedSearchFallback(q).forEach(add);
   }
 
   return merged.slice(0, 40);
 }
 
 export async function parseMealText(text, choices = {}) {
+  const { buildMealParsePayload } = await import('@/lib/api/mealParseContext');
   const res = await apiFetch('/api/parse-meal', {
     method: 'POST',
     headers: deviceHeaders(),
     body: JSON.stringify({
-      text,
+      ...buildMealParsePayload(text, choices),
       deviceId: deviceHeaders()['X-Device-Id'],
-      choices,
     }),
   });
   if (!res.ok) {

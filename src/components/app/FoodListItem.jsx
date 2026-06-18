@@ -12,7 +12,7 @@ const EMOJI = {
 
 function MacroPills({ protein, fat, carbs }) {
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap text-[10px] tabular-nums leading-none">
+    <div className="flex w-full items-center justify-between whitespace-nowrap text-[10px] tabular-nums leading-none">
       <span className="text-macro-protein">{Math.round(protein || 0)}P</span>
       <span className="text-macro-fat">{Math.round(fat || 0)}F</span>
       <span className="text-macro-carbs">{Math.round(carbs || 0)}C</span>
@@ -31,15 +31,15 @@ export function FoodListItem({ entry, onDelete, onAdd, showAdd, className, timeL
         )}
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-start justify-between gap-4 w-full">
+        <div className="flex w-full items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-sm truncate whitespace-nowrap text-ellipsis">{entry.name}</p>
-            <div className="mt-1">
-              <MacroPills protein={entry.protein} fat={entry.fat} carbs={entry.carbs} />
-            </div>
+          </div>
+          <div className="w-[72px] shrink-0">
+            <MacroPills protein={entry.protein} fat={entry.fat} carbs={entry.carbs} />
           </div>
           {!showAdd && (
-            <div className="shrink-0 min-w-[54px] text-right">
+            <div className="w-[56px] shrink-0 text-right">
               <p className="text-sm font-bold tabular-nums text-white leading-none">{Math.round(entry.calories || 0)}</p>
               <p className="mt-0.5 text-[9px] uppercase tracking-wide text-muted leading-none">Cal</p>
               {timeLabel && <p className="mt-1 text-[9px] text-muted tabular-nums leading-none">{timeLabel}</p>}

@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { enUS } from 'date-fns/locale';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   BookOpen, ChevronLeft, ChevronRight, Loader2, MessageSquareText,
-  Plus, Search, Trash2, Zap,
+  Plus, ScanLine, Search, Trash2, Zap,
 } from 'lucide-react';
 import { useNutritionStore } from '@/store/useNutritionStore';
 import { sumEntries, todayKey, uid } from '@/lib/utils';
 import { FoodListItem } from '@/components/app/FoodListItem';
 import SearchFoodRow from '@/components/app/SearchFoodRow';
 import { PageHeader, Card, MacroLine, Input, Button } from '@/components/ui/primitives';
+import { NumericInput } from '@/components/ui/NumericInput';
 import {
   searchGlobalFoods,
   macrosForGrams,
@@ -19,6 +21,16 @@ import {
 } from '@/lib/api/ingredientsApi';
 import { parseMealLocally } from '@/lib/foods/clientMealParser';
 import { buildDescribedMealEntry } from '@/lib/meals/describedMealEntry';
+import {
+  applyScannedBrandToItem,
+  consumePendingScannedFood,
+  incrementFrequentFood,
+  macrosForWeight,
+  resolveFrequentMealText,
+} from '@/lib/cache/frequentFoods';
+import { estimateFoodFromText } from '../../lib/nutrition/estimatedFoodFallback.js';
+import { invalidateMealsQueries } from '@/lib/api/queryInvalidation';
+import { persistDescribeItemCorrection, applyUserCorrectionToItem } from '@/lib/nutrition/userCorrections';
 
 const LOG_TABS = [
   { id: 'describe', label: 'AI Describe', icon: MessageSquareText },
@@ -40,6 +52,75 @@ function numberOrZero(value) {
   if (value === '') return 0;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function per100gFromFood(food) {
+  if (food.per100g?.calories != null) return food.per100g;
+  const grams = Math.max(1, Number(food.defaultGrams) || 100);
+  return {
+    calories: Math.round(((food.calories || 0) / grams) * 100),
+    protein: Math.round(((food.protein || 0) / grams) * 100 * 10) / 10,
+    carbs: Math.round(((food.carbs || 0) / grams) * 100 * 10) / 10,
+    fat: Math.round(((food.fat || 0) / grams) * 100 * 10) / 10,
+  };
+}
+
+function per100gFromDescribeItem(item) {
+  if (item.per100g?.calories != null) return item.per100g;
+  const grams = Math.max(1, Number(item.weight || item.grams) || 100);
+  return {
+    calories: Math.round(((item.calories || 0) / grams) * 100),
+    protein: Math.round(((item.protein || 0) / grams) * 100 * 10) / 10,
+    carbs: Math.round(((item.carbs || 0) / grams) * 100 * 10) / 10,
+    fat: Math.round(((item.fat || 0) / grams) * 100 * 10) / 10,
+  };
+}
+
+function describeItemWithWeight(item, grams) {
+  const weight = Math.max(1, Number(grams) || 100);
+  const per100g = per100gFromDescribeItem(item);
+  return {
+    ...item,
+    weight,
+    grams: weight,
+    per100g,
+    ...macrosForGrams(per100g, weight),
+    estimated: false,
+    aiEstimated: false,
+    nutritionSource: 'user_verified',
+    confidence: 1,
+    accuracyScore: 100,
+  };
+}
+
+function normalizeDescribeResult(result, sourceText) {
+  const rawItems = result?.items?.length
+    ? result.items
+    : [{ name: sourceText, rawLine: sourceText, weight: 100 }];
+  const items = rawItems.map((item) => {
+    if (item.matched && !item.needsClarification) {
+      return applyScannedBrandToItem(applyUserCorrectionToItem({
+        ...item,
+        nutritionSource: item.estimated || item.aiEstimated
+          ? item.nutritionSource || 'AI Estimated'
+          : item.nutritionSource || 'verified-db',
+      }));
+    }
+    return applyScannedBrandToItem(applyUserCorrectionToItem(estimateFoodFromText(
+      item.rawLine || item.name || sourceText,
+      item.name || item.rawLine || sourceText,
+      item.weight || item.grams || 100,
+    )));
+  });
+
+  return {
+    ...result,
+    items,
+    estimatedMeal: result?.estimatedMeal || items.some((item) => item.estimated || item.aiEstimated),
+    needsClarification: false,
+    pendingCount: 0,
+    clarifications: [],
+  };
 }
 
 function entryTime(entry) {
@@ -69,9 +150,15 @@ function useDebouncedValue(value, delay = 300) {
 }
 
 export default function FoodLogPage() {
-  const {
-    selectedDate, shiftDate, removeEntry, entriesForDate, addEntry, addRecipe, recentFoods, recipes,
-  } = useNutritionStore();
+  const queryClient = useQueryClient();
+  const selectedDate = useNutritionStore((s) => s.selectedDate);
+  const shiftDate = useNutritionStore((s) => s.shiftDate);
+  const removeEntry = useNutritionStore((s) => s.removeEntry);
+  const addEntry = useNutritionStore((s) => s.addEntry);
+  const addRecipe = useNutritionStore((s) => s.addRecipe);
+  const recentFoods = useNutritionStore((s) => s.recentFoods);
+  const recipes = useNutritionStore((s) => s.recipes);
+  const storeEntries = useNutritionStore((s) => s.entries);
   const [activeTab, setActiveTab] = useState('describe');
   const [query, setQuery] = useState('');
   const [quick, setQuick] = useState(initialQuick);
@@ -89,8 +176,11 @@ export default function FoodLogPage() {
   const [describePreview, setDescribePreview] = useState(null);
 
   const entries = useMemo(
-    () => entriesForDate(selectedDate).slice().sort((a, b) => (a.loggedAt || 0) - (b.loggedAt || 0)),
-    [entriesForDate, selectedDate],
+    () => storeEntries
+      .filter((entry) => entry.date === selectedDate)
+      .slice()
+      .sort((a, b) => (a.loggedAt || 0) - (b.loggedAt || 0)),
+    [storeEntries, selectedDate],
   );
   const totals = useMemo(() => sumEntries(entries), [entries]);
   const isToday = selectedDate === todayKey();
@@ -152,6 +242,7 @@ export default function FoodLogPage() {
   }, [describePreview]);
 
   const logFood = (food) => {
+    incrementFrequentFood(food);
     addEntry({ ...food, meal: food.meal || 'snack' });
   };
 
@@ -179,15 +270,10 @@ export default function FoodLogPage() {
   };
 
   const addRecipeIngredient = (food) => {
-    const grams = food.defaultGrams || 100;
-    const macros = food.calories != null && food.searchKind === 'product'
-      ? {
-        calories: food.calories,
-        protein: food.protein,
-        carbs: food.carbs,
-        fat: food.fat,
-      }
-      : macrosForGrams(food.per100g || {}, grams);
+    const weight = 100;
+    const per100g = per100gFromFood(food);
+    const macros = macrosForGrams(per100g, weight);
+    incrementFrequentFood({ ...food, per100g, grams: weight, ...macros });
     setRecipeItems((prev) => [
       ...prev,
       {
@@ -195,12 +281,44 @@ export default function FoodLogPage() {
         name: food.displayName || food.name,
         ingredientId: food.id,
         barcode: food.barcode,
-        grams,
-        per100g: food.per100g || {},
+        weight,
+        grams: weight,
+        baseCaloriesPer100g: per100g.calories || 0,
+        baseProteinPer100g: per100g.protein || 0,
+        baseCarbsPer100g: per100g.carbs || 0,
+        baseFatPer100g: per100g.fat || 0,
+        per100g,
         ...macros,
       },
     ]);
     setRecipeIngredientQuery('');
+  };
+
+  useEffect(() => {
+    const pending = consumePendingScannedFood('recipe');
+    if (!pending?.product) return;
+    setActiveTab('recipes');
+    setShowRecipeBuilder(true);
+    addRecipeIngredient(pending.product);
+  }, []);
+
+  const applyRecipeIngredientWeight = (id, weight) => {
+    const safeWeight = Math.max(0, Number(weight) || 0);
+    setRecipeItems((prev) => prev.map((item) => {
+      if (item.id !== id) return item;
+      const per100g = item.per100g || {
+        calories: item.baseCaloriesPer100g || 0,
+        protein: item.baseProteinPer100g || 0,
+        carbs: item.baseCarbsPer100g || 0,
+        fat: item.baseFatPer100g || 0,
+      };
+      return {
+        ...item,
+        weight: safeWeight,
+        grams: safeWeight,
+        ...macrosForGrams(per100g, safeWeight),
+      };
+    }));
   };
 
   const removeRecipeIngredient = (id) => {
@@ -268,22 +386,18 @@ export default function FoodLogPage() {
     try {
       let result;
       try {
-        result = await parseMealText(describeText, {});
+        result = resolveFrequentMealText(describeText) || await parseMealText(describeText, {});
       } catch {
         result = await parseMealLocally(describeText, {});
       }
 
-      const pending = result.items?.filter((item) => item.needsClarification).length || 0;
-      if (pending > 0) {
-        setDescribeError('This meal needs clarification. Add exact amounts or use the detailed Describe Meal page.');
-        return;
-      }
-      if (!result.items?.length) {
-        setDescribeError('No verified foods found. Try adding amounts like "1 banana" or "200g chicken".');
+      const normalized = normalizeDescribeResult(result, describeText.trim());
+      if (!normalized.items?.length) {
+        setDescribeError('Could not identify any food. Try adding an amount like "4 rice cakes" or "200g chicken".');
         return;
       }
 
-      setDescribePreview(result);
+      setDescribePreview(normalized);
       setIsReviewing(true);
     } catch (error) {
       setDescribeError(error.message || 'Could not analyze this meal.');
@@ -302,6 +416,7 @@ export default function FoodLogPage() {
         items: describePreview.items,
         name: describePreview.mealName,
       });
+      describePreview.items.forEach((item) => incrementFrequentFood(item));
       logFood(entry);
 
       if (describePreview.estimatedMeal || describePreview.items.some((item) => item.estimated || item.aiEstimated)) {
@@ -318,6 +433,7 @@ export default function FoodLogPage() {
           estimatedMeal: describePreview.estimatedMeal || describePreview.items.some((item) => item.estimated || item.aiEstimated),
           sourceText: describeText,
         });
+        invalidateMealsQueries(queryClient);
       }
 
       setDescribeText('');
@@ -336,8 +452,79 @@ export default function FoodLogPage() {
     setDescribeError('');
   };
 
+  const updateDescribeBrand = (index, selectedIndex) => {
+    setDescribePreview((prev) => {
+      if (!prev?.items?.[index]) return prev;
+      const items = [...prev.items];
+      const item = items[index];
+      const option = item.scannedBrandOptions?.[Number(selectedIndex)];
+      if (!option) return prev;
+      const weight = item.weight || item.grams || option.defaultGrams || 100;
+      items[index] = {
+        ...item,
+        name: option.displayName || option.name,
+        brandName: option.brand,
+        barcode: option.barcode,
+        per100g: option.per100g,
+        weight,
+        grams: weight,
+        ...macrosForWeight(option.per100g, weight),
+        nutritionSource: 'user-scanned-brand',
+        selectedScannedBrandIndex: Number(selectedIndex),
+      };
+      persistDescribeItemCorrection(items[index]);
+      return { ...prev, items };
+    });
+  };
+
+  const updateDescribeItem = (index, patch) => {
+    setDescribePreview((prev) => {
+      if (!prev?.items?.[index]) return prev;
+      const items = [...prev.items];
+      let item = { ...items[index] };
+
+      if (patch.name != null) {
+        item.name = String(patch.name).trim() || item.name;
+      }
+
+      if (patch.weight != null) {
+        item = describeItemWithWeight(item, Number(patch.weight) || 100);
+      } else {
+        const grams = Math.max(1, Number(item.weight || item.grams) || 100);
+        const fields = ['calories', 'protein', 'carbs', 'fat'];
+        let touched = false;
+        for (const field of fields) {
+          if (patch[field] != null) {
+            item[field] = Math.max(0, Number(patch[field]) || 0);
+            touched = true;
+          }
+        }
+        if (touched) {
+          item = {
+            ...item,
+            estimated: false,
+            aiEstimated: false,
+            nutritionSource: 'user_verified',
+            confidence: 1,
+            accuracyScore: 100,
+            per100g: {
+              calories: Math.round((item.calories / grams) * 100),
+              protein: Math.round((item.protein / grams) * 100 * 10) / 10,
+              carbs: Math.round((item.carbs / grams) * 100 * 10) / 10,
+              fat: Math.round((item.fat / grams) * 100 * 10) / 10,
+            },
+          };
+        }
+      }
+
+      persistDescribeItemCorrection(item);
+      items[index] = item;
+      return { ...prev, items };
+    });
+  };
+
   return (
-    <div className="px-4 pt-3 safe-top pb-nav space-y-4 max-w-lg mx-auto">
+    <div className="px-4 pt-3 safe-top space-y-4 max-w-lg mx-auto">
       <PageHeader
         label="FOOD LOG"
         title={dateTitle}
@@ -376,11 +563,11 @@ export default function FoodLogPage() {
               key={id}
               type="button"
               onClick={() => setActiveTab(id)}
-              className={`min-w-0 flex items-center justify-center gap-1 px-1.5 py-2.5 text-[10px] font-semibold transition-colors ${
+              className={`min-w-0 flex items-center justify-center gap-1 px-2 py-2.5 text-xs font-medium transition-colors ${
                 activeTab === id ? 'text-white border-b-2 border-white' : 'text-muted border-b-2 border-transparent'
               }`}
             >
-              <Icon className="w-3 h-3 shrink-0" />
+              <Icon className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{label}</span>
             </button>
           ))}
@@ -397,6 +584,11 @@ export default function FoodLogPage() {
                 className="h-10 pl-9 bg-zinc-900 border-zinc-800 text-[13px] focus:ring-white/10"
               />
             </div>
+            <Link to="/scanner?mode=barcode&return=/log&target=search" className="block">
+              <Button variant="secondary" className="w-full h-10">
+                <ScanLine className="w-4 h-4" /> Scan barcode or nutrition label
+              </Button>
+            </Link>
             {queryText.length >= 2 && (searchQuery.isLoading || queryText !== debouncedQueryText) && (
               <div className="flex items-center justify-center py-8 text-muted">
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -462,12 +654,13 @@ export default function FoodLogPage() {
                 ['carbs', 'Carbs (g)'],
                 ['fat', 'Fat (g)'],
               ].map(([key, label]) => (
-                <Input
+                <NumericInput
                   key={key}
-                  type="number"
-                  inputMode="decimal"
+                  className="w-full h-12 rounded-full bg-surface-2 border border-white/[0.08] px-4 text-sm text-white placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-white/20 transition-shadow"
                   value={quick[key]}
-                  onChange={(e) => setQuick((prev) => ({ ...prev, [key]: e.target.value }))}
+                  onValueChange={(next) => setQuick((prev) => ({ ...prev, [key]: next }))}
+                  fallback={0}
+                  decimal={key !== 'calories'}
                   placeholder={label}
                 />
               ))}
@@ -509,13 +702,13 @@ export default function FoodLogPage() {
                   value={recipeName}
                   onChange={(e) => setRecipeName(e.target.value)}
                 />
-                <Input
+                <NumericInput
                   {...recipeInputProps}
-                  inputMode="numeric"
-                  min="1"
+                  className="w-full h-12 rounded-full bg-surface-2 border border-white/[0.08] px-4 text-sm text-white placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-white/20 transition-shadow"
                   placeholder="Servings"
                   value={recipeServings}
-                  onChange={(e) => setRecipeServings(e.target.value)}
+                  onValueChange={setRecipeServings}
+                  fallback={1}
                 />
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -527,6 +720,11 @@ export default function FoodLogPage() {
                     onChange={(e) => setRecipeIngredientQuery(e.target.value)}
                   />
                 </div>
+                <Link to="/scanner?mode=barcode&return=/log&target=recipe" className="block">
+                  <Button variant="secondary" className="w-full h-10">
+                    <ScanLine className="w-4 h-4" /> Scan ingredient package
+                  </Button>
+                </Link>
                 {recipeIngredientQueryResult.isLoading && (
                   <div className="flex justify-center py-4 text-muted">
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -551,6 +749,21 @@ export default function FoodLogPage() {
                       <div key={item.id} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{item.name}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <label htmlFor={`recipe-weight-${item.id}`} className="text-[10px] font-bold uppercase tracking-wide text-muted">
+                              Amount
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <NumericInput
+                                id={`recipe-weight-${item.id}`}
+                                value={item.weight ?? item.grams ?? 100}
+                                onNumberChange={(weight) => applyRecipeIngredientWeight(item.id, weight)}
+                                fallback={100}
+                                suffix="g"
+                                className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 w-20 text-center text-white text-xs focus:outline-none focus:ring-2 focus:ring-white/15"
+                              />
+                            </div>
+                          </div>
                           <MacroLine
                             calories={item.calories}
                             protein={item.protein}
@@ -638,28 +851,90 @@ export default function FoodLogPage() {
                       key={`${item.rawLine || item.name}-${index}`}
                       className="rounded-2xl bg-surface-2 border border-white/[0.06] px-3 py-2.5"
                     >
+                      {(() => {
+                        const isEstimated = item.estimated || item.aiEstimated;
+                        return (
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-sm truncate">{item.name}</p>
-                          <p className="text-[10px] text-muted mt-0.5">
-                            {item.weight || item.grams || 0}g
-                            {(item.estimated || item.aiEstimated) && <span className="text-amber-300"> · AI Estimated</span>}
-                          </p>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            <Input
+                              value={item.name || ''}
+                              onChange={(e) => updateDescribeItem(index, { name: e.target.value })}
+                              className="h-8 text-sm font-bold min-w-0 flex-1"
+                              aria-label={`Edit name for item ${index + 1}`}
+                            />
+                            {item.scannedBrandOptions?.length > 1 && (
+                              <select
+                                value={item.selectedScannedBrandIndex || 0}
+                                onChange={(e) => updateDescribeBrand(index, e.target.value)}
+                                className="shrink-0 max-w-[92px] rounded-full bg-zinc-950 border border-zinc-800 px-2 py-1 text-[9px] font-bold text-zinc-200 focus:outline-none"
+                                aria-label={`Switch brand for ${item.name}`}
+                              >
+                                {item.scannedBrandOptions.map((option, optionIndex) => (
+                                  <option key={option.food_id || option.barcode || option.name} value={optionIndex}>
+                                    ⇆ {option.brand || option.name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${
+                              isEstimated
+                                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/20'
+                                : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'
+                            }`}
+                            >
+                              {isEstimated ? 'AI Estimated' : 'Verified'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted shrink-0">Weight</span>
+                            <NumericInput
+                              value={item.weight || item.grams || 0}
+                              onNumberChange={(value) => updateDescribeItem(index, { weight: value })}
+                              className="h-7 w-20 text-xs"
+                              suffix="g"
+                            />
+                          </div>
                         </div>
-                        <p className="text-sm font-extrabold tabular-nums shrink-0">{Math.round(item.calories || 0)} kcal</p>
+                        <NumericInput
+                          value={Math.round(item.calories || 0)}
+                          onNumberChange={(value) => updateDescribeItem(index, { calories: value })}
+                          className="h-8 w-20 text-sm font-extrabold shrink-0"
+                          suffix="kcal"
+                        />
                       </div>
+                        );
+                      })()}
                       <div className="grid grid-cols-3 gap-2 mt-2 text-[10px] tabular-nums">
                         <div className="rounded-lg bg-black/20 px-2 py-1 text-center">
                           <span className="text-muted">P </span>
-                          <span className="font-bold text-macro-protein">{Math.round((item.protein || 0) * 10) / 10}g</span>
+                          <NumericInput
+                            value={Math.round((item.protein || 0) * 10) / 10}
+                            onNumberChange={(value) => updateDescribeItem(index, { protein: value })}
+                            decimal
+                            className="h-6 w-full text-[10px] font-bold text-macro-protein bg-transparent border-0 text-center"
+                            suffix="g"
+                          />
                         </div>
                         <div className="rounded-lg bg-black/20 px-2 py-1 text-center">
                           <span className="text-muted">C </span>
-                          <span className="font-bold text-macro-carbs">{Math.round((item.carbs || 0) * 10) / 10}g</span>
+                          <NumericInput
+                            value={Math.round((item.carbs || 0) * 10) / 10}
+                            onNumberChange={(value) => updateDescribeItem(index, { carbs: value })}
+                            decimal
+                            className="h-6 w-full text-[10px] font-bold text-macro-carbs bg-transparent border-0 text-center"
+                            suffix="g"
+                          />
                         </div>
                         <div className="rounded-lg bg-black/20 px-2 py-1 text-center">
                           <span className="text-muted">F </span>
-                          <span className="font-bold text-macro-fat">{Math.round((item.fat || 0) * 10) / 10}g</span>
+                          <NumericInput
+                            value={Math.round((item.fat || 0) * 10) / 10}
+                            onNumberChange={(value) => updateDescribeItem(index, { fat: value })}
+                            decimal
+                            className="h-6 w-full text-[10px] font-bold text-macro-fat bg-transparent border-0 text-center"
+                            suffix="g"
+                          />
                         </div>
                       </div>
                     </div>
